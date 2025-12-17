@@ -21,6 +21,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'phone_number', // <--- PENTING: Tambahkan ini agar No HP bisa disimpan
     ];
 
     /**
@@ -40,6 +41,13 @@ class User extends Authenticatable
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',
+        'password' => 'hashed', // Agar password otomatis di-hash
     ];
+
+    // --- RELASI KE POST ---
+    public function posts()
+    {
+        // Satu User bisa memiliki banyak Post
+        return $this->hasMany(Post::class);
+    }
 }
