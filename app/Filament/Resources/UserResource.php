@@ -12,6 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
 {
@@ -23,7 +24,34 @@ class UserResource extends Resource
     {
         return $form
             ->schema([
-                //
+                // 1. Input Nama
+                Forms\Components\TextInput::make('name')
+                    ->required()
+                    ->maxLength(255),
+
+                // 2. Input Email
+                Forms\Components\TextInput::make('email')
+                    ->email()
+                    ->required()
+                    ->maxLength(255),
+
+                // 3. Input Nomor HP (Fitur Request Kamu)
+                Forms\Components\TextInput::make('phone_number')
+                    ->tel() // Validasi format telepon
+                    ->label('Nomor HP')
+                    ->maxLength(20),
+
+                // 4. Input Password (Dengan Logika Hashing Aman)
+                Forms\Components\TextInput::make('password')
+                    ->password()
+                    ->label('Password')
+                    // Wajib diisi HANYA saat membuat user baru
+                    ->required(fn(string $operation): bool => $operation === 'create')
+                    // Hash password sebelum disimpan
+                    ->dehydrateStateUsing(fn(string $state): string => Hash::make($state))
+                    // Hanya kirim ke database jika kolom diisi (supaya edit aman)
+                    ->dehydrated(fn(?string $state): bool => filled($state))
+                    ->maxLength(255),
             ]);
     }
 
