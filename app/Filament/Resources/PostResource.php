@@ -29,72 +29,108 @@ class PostResource extends Resource
     {
         return $form
             ->schema([
-                // 1. Pilih Penulis (Relasi ke User)
-                Select::make('user_id')
-                    ->relationship('user', 'name') // Ambil data dari tabel users, tampilkan kolom name
-                    ->required()
-                    ->label('Penulis')
-                    ->searchable(), // Agar bisa cari nama kalau usernya banyak
+                // --- SECTION KIRI (Konten Utama) ---
+                Forms\Components\Section::make('Konten Utama')->schema([
+                    Forms\Components\TextInput::make('title')
+                        ->required()
+                        ->live(onBlur: true)
+                        ->afterStateUpdated(fn($set, $state) => $set('slug', Str::slug($state))),
 
-                // 2. Input Judul (Dengan Magic Auto-Slug)
-                TextInput::make('title')
-                    ->required()
-                    ->live(onBlur: true) // Tunggu sampai user selesai ngetik baru jalan
-                    ->afterStateUpdated(
-                        fn(Set $set, ?string $state) =>
-                        $set('slug', Str::slug($state)) // Ubah "Halo Dunia" jadi "halo-dunia"
-                    ),
+                    Forms\Components\TextInput::make('slug')
+                        ->disabled()
+                        ->dehydrated()
+                        ->unique(ignoreRecord: true),
 
-                // 3. Input Slug (Otomatis terisi, user tidak perlu isi manual)
-                TextInput::make('slug')
-                    ->required()
-                    ->disabled() // Dimatikan agar tidak diubah sembarangan
-                    ->dehydrated() // TAPI tetap dikirim ke database saat save
-                    ->unique(ignoreRecord: true), // Pastikan tidak ada link kembar
+                    Forms\Components\RichEditor::make('content')
+                        ->required()
+                        ->columnSpanFull(),
+                ])->columnSpan(2), // Lebar 2 kolom
 
-                // 4. Input Konten Artikel (Editor Teks Kaya)
-                RichEditor::make('content')
-                    ->required()
-                    ->columnSpanFull(), // Agar lebarnya memenuhi layar
-            ]);
+                // --- SECTION KANAN (Meta Data) ---
+                Forms\Components\Section::make('Meta Data')->schema([
+                    // 1. Relasi ke Category
+                    Forms\Components\Select::make('category_id')
+                        ->relationship('category', 'name')
+                        ->required()
+                        ->label('Kategori'),
+
+                    // 2. Relasi ke User (Penulis) - Tetap ada
+                    Forms\Components\Select::make('user_id')
+                        ->relationship('user', 'name')
+                        ->required()
+                        ->label('Penulis'),
+
+                    // 3. Status Post (Draft/Published)
+                    Forms\Components\Select::make('status')
+                        ->options([
+                            'draft' => 'Draft',
+                            'published' => 'Published',
+                        ])
+                        ->default('draft')
+                        ->required(),
+
+                    // 4. Upload Gambar (Sesuai PRD)
+                    Forms\Components\FileUpload::make('cover_file_url')
+                        ->image()
+                        ->directory('posts-covers') // Folder penyimpanan
+                        ->label('Cover Image'),
+
+                    // 5. Tanggal Publish
+                    Forms\Components\DateTimePicker::make('published_at'),
+
+                ])->columnSpan(1), // Lebar 1 kolom
+            ])->columns(3); // Total grid 3 kolom
     }
 
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                // 1. Judul Artikel
-                Tables\Columns\TextColumn::make('title')
-                    ->searchable() // Bisa dicari
-                    ->sortable()
-                    ->weight('bold') // Cetak tebal biar jelas
-                    ->limit(50), // Batasi panjang teks biar tabel ga kepanjangan
+                // 1. Cover Image
+                Tables\Columns\ImageColumn::make('cover_file_url')
+                    ->label('Cover'),
 
-                // 2. Nama Penulis (Relasi)
-                Tables\Columns\TextColumn::make('user.name')
-                    ->label('Penulis')
+                // 2. Judul
+                Tables\Columns\TextColumn::make('title')
                     ->searchable()
+                    ->limit(30)
                     ->sortable(),
 
-                // 3. Slug (Link) - Opsional biar admin tau linknya
-                Tables\Columns\TextColumn::make('slug')
-                    ->color('gray')
-                    ->limit(30),
+                // 3. Kategori (Badge Warna)
+                Tables\Columns\TextColumn::make('category.name')
+                    ->label('Kategori')
+                    ->badge()
+                    ->color('info') // Warna biru muda
+                    ->sortable(),
 
-                // 4. Tanggal Dibuat
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->label('Dibuat Pada')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                // 4. Penulis
+                Tables\Columns\TextColumn::make('user.name')
+                    ->label('Penulis')
+                    ->sortable(),
+
+                // 5. Status (Badge Hijau/Abu)
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn(string $state): string => match ($state) {
+                        'draft' => 'gray',
+                        'published' => 'success',
+                    }),
+
+                // 6. Views (Analisa Performa)
+                Tables\Columns\TextColumn::make('view_count')
+                    ->label('Views')
+                    ->icon('heroicon-m-eye')
+                    ->sortable(),
             ])
             ->filters([
                 //
             ])
+            // --- BAGIAN INI YANG MEMUNCULKAN TOMBOL EDIT/DELETE ---
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(), // Tombol hapus
+                Tables\Actions\DeleteAction::make(),
             ])
+            // ------------------------------------------------------
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

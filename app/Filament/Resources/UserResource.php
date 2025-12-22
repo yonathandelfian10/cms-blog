@@ -3,55 +3,72 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
-use App\Filament\Resources\UserResource\RelationManagers;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-user-group'; // Ikon diganti biar lebih cocok (Grup User)
+
+    protected static ?string $navigationLabel = 'Manajemen User'; // Label di Sidebar
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                // 1. Input Nama
-                Forms\Components\TextInput::make('name')
-                    ->required()
-                    ->maxLength(255),
+                // --- SECTION 1: Informasi Dasar ---
+                Forms\Components\Section::make('Informasi Pribadi')->schema([
+                    Forms\Components\TextInput::make('name')
+                        ->label('Nama Lengkap')
+                        ->required()
+                        ->maxLength(255),
 
-                // 2. Input Email
-                Forms\Components\TextInput::make('email')
-                    ->email()
-                    ->required()
-                    ->maxLength(255),
+                    Forms\Components\TextInput::make('email')
+                        ->email()
+                        ->required()
+                        ->maxLength(255),
 
-                // 3. Input Nomor HP (Fitur Request Kamu)
-                Forms\Components\TextInput::make('phone_number')
-                    ->tel() // Validasi format telepon
-                    ->label('Nomor HP')
-                    ->maxLength(20),
+                    // Menambahkan input No HP agar sinkron dengan tabel
+                    Forms\Components\TextInput::make('phone_number')
+                        ->label('Nomor HP')
+                        ->tel()
+                        ->maxLength(20),
+                ])->columns(2),
 
-                // 4. Input Password (Dengan Logika Hashing Aman)
-                Forms\Components\TextInput::make('password')
-                    ->password()
-                    ->label('Password')
-                    // Wajib diisi HANYA saat membuat user baru
-                    ->required(fn(string $operation): bool => $operation === 'create')
-                    // Hash password sebelum disimpan
-                    ->dehydrateStateUsing(fn(string $state): string => Hash::make($state))
-                    // Hanya kirim ke database jika kolom diisi (supaya edit aman)
-                    ->dehydrated(fn(?string $state): bool => filled($state))
-                    ->maxLength(255),
+                // --- SECTION 2: Hak Akses & Keamanan ---
+                Forms\Components\Section::make('Akses & Keamanan')->schema([
+
+                    // 1. Pilih Role (Integrasi Filament Shield)
+                    Forms\Components\Select::make('roles')
+                        ->relationship('roles', 'name')
+                        ->multiple()
+                        ->preload()
+                        ->searchable()
+                        ->label('Role / Peran'),
+
+                    // 2. Status Active/Inactive
+                    Forms\Components\Toggle::make('is_active')
+                        ->label('Status Aktif')
+                        ->default(true)
+                        ->helperText('Jika dimatikan, user tidak akan bisa login ke sistem.')
+                        ->onColor('success')
+                        ->offColor('danger'),
+
+                    // 3. Password (Dengan Hashing)
+                    Forms\Components\TextInput::make('password')
+                        ->password()
+                        ->dehydrateStateUsing(fn($state) => Hash::make($state))
+                        ->dehydrated(fn($state) => filled($state))
+                        ->required(fn(string $operation): bool => $operation === 'create')
+                        ->label('Password Baru'),
+                ])->columns(1),
             ]);
     }
 
@@ -59,33 +76,42 @@ class UserResource extends Resource
     {
         return $table
             ->columns([
-                // 1. Menampilkan Nama
+                // 1. Nama
                 Tables\Columns\TextColumn::make('name')
-                    ->label('Nama Lengkap') // Label Header Tabel
-                    ->searchable()          // Agar bisa dicari
-                    ->sortable(),           // Agar bisa diurutkan A-Z
-
-                // 2. Menampilkan Email
-                Tables\Columns\TextColumn::make('email')
-                    ->icon('heroicon-m-envelope') // Ikon surat kecil
-                    ->copyable(),                 // Agar bisa diklik copy
-
-                // 3. Menampilkan No HP (Fitur Request Kamu)
-                Tables\Columns\TextColumn::make('phone_number')
-                    ->label('Nomor HP')
-                    ->default('-'), // Kalau kosong, tampilkan strip
-
-                // 4. Menampilkan Tanggal Dibuat (Opsional tapi bagus)
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
+                    ->searchable()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true), // Sembunyi default
+                    ->weight('bold'),
+
+                // 2. Email
+                Tables\Columns\TextColumn::make('email')
+                    ->icon('heroicon-m-envelope')
+                    ->searchable()
+                    ->copyable(),
+
+                // 3. Role (Badge)
+                Tables\Columns\TextColumn::make('roles.name')
+                    ->label('Role')
+                    ->badge()
+                    ->color('info')
+                    ->separator(','),
+
+                // 4. Status Aktif (Switch)
+                Tables\Columns\ToggleColumn::make('is_active')
+                    ->label('Aktif'),
+
+                // 5. No HP
+                Tables\Columns\TextColumn::make('phone_number')
+                    ->label('No HP')
+                    ->default('-'),
             ])
             ->filters([
-                //
+                Tables\Filters\TernaryFilter::make('is_active')
+                    ->label('Status User'),
             ])
+            // --- TOMBOL AKSI ---
             ->actions([
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

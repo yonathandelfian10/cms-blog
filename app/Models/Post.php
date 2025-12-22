@@ -12,15 +12,29 @@ class Post extends Model
     // Kolom apa saja yang boleh diisi datanya
     protected $fillable = [
         'user_id',
+        'category_id',
         'title',
         'slug',
         'content',
+        'cover_file_url',
+        'status',
+        'view_count',
+        'published_at'
+    ];
+
+
+    protected $casts = [
+        'published_at' => 'datetime', // Agar dibaca sebagai format tanggal
     ];
 
     // --- RELASI KE USER ---
     public function user()
     {
-        // Satu Post dimiliki oleh satu User
         return $this->belongsTo(User::class);
+    }
+
+    public function category()
+    { // <--- Tambahkan ini
+        return $this->belongsTo(Category::class);
     }
 }

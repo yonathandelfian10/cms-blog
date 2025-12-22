@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\HomeController;
 
 /*
 |--------------------------------------------------------------------------
@@ -13,6 +14,11 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/', function () {
-    return view('welcome');
-});
+
+
+// Halaman Depan
+Route::get('/', [HomeController::class, 'index'])->name('home');
+
+// Halaman Baca Artikel (Pakai Slug biar link-nya cantik)
+// Contoh: website.com/baca/cara-install-laravel
+Route::get('/baca/{post:slug}', [HomeController::class, 'show'])->name('post.show');

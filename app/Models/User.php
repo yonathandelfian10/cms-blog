@@ -7,10 +7,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles; // <--- Import ini
+use Filament\Panel;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasName; // <--- 1. Tambahkan ini
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser, HasName // <--- 2. Implementasikan di sini
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles; // <--- Tambahkan HasRoles
 
     /**
      * The attributes that are mass assignable.
@@ -21,7 +25,10 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'phone_number', // <--- PENTING: Tambahkan ini agar No HP bisa disimpan
+        'phone_number',
+        'google_id',
+        'avatar_url',
+        'is_active', // <--- Tambahkan ini
     ];
 
     /**
@@ -47,7 +54,32 @@ class User extends Authenticatable
     // --- RELASI KE POST ---
     public function posts()
     {
-        // Satu User bisa memiliki banyak Post
         return $this->hasMany(Post::class);
+    }
+
+    public function events()
+    { // <--- Tambahkan ini
+        return $this->hasMany(Event::class);
+    }
+
+    // Fungsi untuk membatasi siapa yang bisa login Admin (PENTING untuk fitur Active/Inactive)
+    public function canAccessPanel(Panel $panel): bool
+    {
+        // User bisa akses jika: Punya email verified DAN statusnya Active
+        return $this->is_active;
+    }
+
+    // --- 3. TAMBAHKAN FUNGSI INI DI PALING BAWAH ---
+    public function getFilamentName(): string
+    {
+        // Ambil nama role pertama (misal: 'super_admin')
+        $role = $this->getRoleNames()->first();
+
+        // Ubah jadi huruf besar yang rapi (misal: "Super Admin")
+        $roleFormatted = str($role)->headline();
+
+        // Gabungkan Nama User + Role
+        // Hasilnya nanti: "Yonathan Sebastian - Super Admin"
+        return "{$this->name} ({$roleFormatted})";
     }
 }
